@@ -1,6 +1,0 @@
-Server is running on 127.0.0.1:5345
-client_-1 connected: ('127.0.0.1', 56442)
-[32mclient_56440 registered: ('127.0.0.1', 56440)
-client_0 connected: ('127.0.0.1', 56445)
-[32mclient_56443 registered: ('127.0.0.1', 56443)
-[90mConnection closed by client_1
