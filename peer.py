@@ -4,15 +4,16 @@ from _thread import start_new_thread
 import json
 import random
 from time import sleep
+import time
 
 # Global variables
 my_addr = None
 # Output file for tracking the peers
 output_file = None
 # Time to live in seconds
-TTL = 5 
+TTL = 13
 server_sockets = []
-
+time_to_send_message = 5
 # Class to make a peer object
 class Peer():
     def __init__(self,ip,port,conn):
@@ -22,7 +23,7 @@ class Peer():
         self.conn = conn
         # number of tries to check the liveness of the peer
         self.tries = 0
-
+        self.message_list = set()
 # Global dictionary to keep track of the connected peers
 connected_peers = {}
 
@@ -38,7 +39,8 @@ def listen_server(conn):
 # Function to send the dead-node message to the seed server
 def send_death_message(peer_port):
     
-    message = {'type':'Death','ip':my_addr[0],'port':peer_port}
+    cur_time = time.localtime()
+    message = {'type':'Death','ip':my_addr[0],'port':peer_port,'time':time.asctime(cur_time)}
     
     # write the message to the output file
     with open(output_file,'a') as f:
@@ -56,7 +58,8 @@ def send_death_message(peer_port):
 def check_liveness(peer_port):
     global connected_peers
     
-    message = {'type':'Liveness','ip':my_addr[0],'port':my_addr[1]}
+    cur_time = time.localtime()
+    message = {'type':'Liveness','ip':my_addr[0],'port':my_addr[1],'time':time.asctime(cur_time)}
     
     while(True):
         # if the peer is not in the list of connected peers then close the connection
@@ -113,7 +116,8 @@ def listen_peer(peer):
         
         # if the type of the message is peer_Request then send the peer_Reply message to the peer
         if(data['type']=='peer_Request'):
-            message = {'type':'peer_Reply','ip':my_addr[0],'port':my_addr[1]}
+            cur_time = time.localtime()
+            message = {'type':'peer_Reply','ip':my_addr[0],'port':my_addr[1],'time':time.asctime(cur_time)}
             peer.conn.sendall(json.dumps(message).encode())
             peer.ip = data['ip']
             peer.port = data['port']
@@ -138,8 +142,9 @@ def listen_peer(peer):
             
             # write the liveness message to the output file
             with open(output_file,'a') as f:
-                print(f"Received liveness message from {peer.ip}:{peer.port}",file=f)
-            message = {'type':'Liveness_reply','ip':my_addr[0],'port':my_addr[1]}
+                print(f"Received liveness message from {peer.ip}:{peer.port} at {data['time']}",file=f)
+            cur_time = time.localtime()
+            message = {'type':'Liveness_reply','ip':my_addr[0],'port':my_addr[1],'time':time.asctime(cur_time)}
             peer.conn.sendall(json.dumps(message).encode())
 
         # if the type of the message is 'Liveness_reply' then decrease the number of tries
@@ -147,16 +152,20 @@ def listen_peer(peer):
             
             # write the liveness reply to the output file
             with open(output_file,'a') as f:
-                print(f"Received liveness reply from {peer.ip}:{peer.port}",file=f)
+                print(f"Received liveness reply from {peer.ip}:{peer.port} at {data['time']}",file=f)
             connected_peers[peer.port].tries = max(0,connected_peers[peer.port].tries-1)
 
         # Send the data to all the peers
         else:
             
             # write the data to the output file with the address of the peer
-            with open(output_file,'a') as f:
-                print(f'{peer.ip}:{peer.port}: ',data,file=f)
-            send_all_peers(data,peer)
+            if data['type'] == 'message' and f"{data['data']}_{data['time']}" in peer.message_list:
+                continue
+            else:
+                peer.message_list.add(f"{data['data']}_{data['time']}")
+                with open(output_file,'a') as f:
+                    print(f'{peer.ip}:{peer.port}: ',data,file=f)
+                send_all_peers(data,peer)
 
 # Function to accept the peers
 def accept_peers(sock):
@@ -261,11 +270,13 @@ def main():
                 break
 
         while True:
-            data = input()
+            data = random.choice(['hello','hi','bye'])
             if(data=='exit'):
                 break
-            message = {'type':'message','data':data}
+            time_stamp = time.localtime() 
+            message = {'type':'message','data':data,'time':time.asctime(time_stamp)}
             send_all_peers(json.dumps(message),None)
+            sleep(time_to_send_message)
 
 
 if __name__ == '__main__':
