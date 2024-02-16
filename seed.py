@@ -1,5 +1,6 @@
 import subprocess
 import platform
+import os
 
 def run_in_new_terminal(command):
     if platform.system() == "Windows":
@@ -10,11 +11,13 @@ def run_in_new_terminal(command):
         subprocess.Popen(["open", "-a", "Terminal", command])
 
 def start_servers():
+    os.makedirs('bin/servers', exist_ok=True)
+    os.makedirs('bin/clients', exist_ok=True)
     with open("config.csv", 'r') as f:
         lines = f.readlines()[1:]
         for line in lines:
             ip, port, node_id = line.strip().split(',')
-            command = f"python echo-server.py {port} {node_id}"
+            command = f"python` + echo-server.py {port} {node_id}"
             print(f"Starting server for port {port} and node_id {node_id}")
             run_in_new_terminal(command)
 
