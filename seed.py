@@ -17,7 +17,7 @@ def start_servers():
         lines = f.readlines()[1:]
         for line in lines:
             ip, port, node_id = line.strip().split(',')
-            command = f"python` + echo-server.py {port} {node_id}"
+            command = f"python echo-server.py {port} {node_id}"
             print(f"Starting server for port {port} and node_id {node_id}")
             run_in_new_terminal(command)
 

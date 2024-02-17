@@ -1,10 +1,11 @@
-
 import socket
 from _thread import start_new_thread
 import json
 import random
 from time import sleep
 import time
+import logging
+from colorlog import ColoredFormatter
 
 # Global variables
 my_addr = None
@@ -17,6 +18,20 @@ time_to_send_message = 5
 PACKET_LEN = 128
 # Class to make a peer object
 message_list = set()
+# Create logger
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+colors = {
+    'INFO' :{
+        'death': 'red',
+        'liveness': 'green',
+        'liveness_reply': 'green',
+        'peer_request': 'blue',
+        'peer_reply': 'blue',
+        'message': 'yellow'
+    }
+}
+
 class Peer():
     def __init__(self,ip,port,conn):
         # ip address of the peer
@@ -56,7 +71,7 @@ def send_death_message(peer_port):
     message = add_padding(json.dumps(message)).encode()
     # write the message to the output file
     with open(output_file,'a') as f:
-        print( f"Sending death message to {peer_port}",file=f)
+        logger.info( f"Sending death message to {peer_port}",extra={'log_color':'INFO[death]'})
     
     # send the message to the seed nodes
     for socket in server_sockets:
@@ -100,7 +115,7 @@ def check_liveness(peer_port):
 
 # Function to listen to the peer
 def listen_peer(peer):
-    global connected_peers,my_addr,output_file
+    global connected_peers,my_addr,output_file,logger
     
     while True:
         
@@ -137,7 +152,7 @@ def listen_peer(peer):
             
             # write the peer request to the output file
             with open(output_file,'a') as f:
-                print(f"Peer request from {peer.ip}:{peer.port}",file=f)
+                logger.info(f"Peer request from {peer.ip}:{peer.port}",extra={'log_color':'INFO[peer_request]'})
             
             # add the peer to the list of connected peers
             connected_peers[peer.port] = peer
@@ -148,14 +163,14 @@ def listen_peer(peer):
         # if the type of the message is peer_Reply then write the peer request accepted to the output file
         elif data['type']=='peer_Reply':
             with open(output_file,'a') as f:
-                print(f"Peer request accepted from {peer.ip}:{peer.port}",file=f)
+                logger.info(f"Peer request accepted from {peer.ip}:{peer.port}",extra={'log_color':'INFO[peer_reply]'})
 
         # if the type of message is 'Liveness' then send the liveness_reply message to the peer
         elif data['type'] == 'Liveness':
             
             # write the liveness message to the output file
             with open(output_file,'a') as f:
-                print(f"Received liveness message from {peer.ip}:{peer.port} at {data['time']}",file=f)
+                logger.info(f"Received liveness message from {peer.ip}:{peer.port} at {data['time']}",extra={'log_color':'INFO[liveness]'})
             cur_time = time.localtime()
             message = {'type':'Liveness_reply','ip':my_addr[0],'port':my_addr[1],'time':time.asctime(cur_time)}
             peer.conn.sendall(add_padding(json.dumps(message)).encode())
@@ -165,7 +180,7 @@ def listen_peer(peer):
             
             # write the liveness reply to the output file
             with open(output_file,'a') as f:
-                print(f"Received liveness reply from {peer.ip}:{peer.port} at {data['time']}",file=f)
+                logger.info(f"Sending liveness reply to {peer.ip}:{peer.port} at {data['time']}",extra={'log_color':'INFO[liveness_reply]'})
             connected_peers[peer.port].tries = max(0,connected_peers[peer.port].tries-1)
 
         # Send the data to all the peers
@@ -179,7 +194,7 @@ def listen_peer(peer):
                 # peer.message_list.add(f"{data['data']}_{data['time']}")
                 message_list.add(f"{data['data']}_{data['time']}")
                 with open(output_file,'a') as f:
-                    print(f'{peer.ip}:{peer.port}: ',data,file=f)
+                    logger.info(f'{peer.ip}:{peer.port}: {data}',extra={'log_color':'INFO[message]'})
                 
                 send_all_peers(data,peer)
 # Function to accept the peers
@@ -224,16 +239,22 @@ def send_messages():
 
 # Main function
 def main():
-    global my_addr,connected_peers,output_file, server_sockets
+    global my_addr,connected_peers,output_file, server_sockets,logger,colors
 
     # create a socket for the client
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.bind(('127.0.0.1',0))
         my_addr = sock.getsockname()
-        output_file = f'bin/clients/output_{my_addr[1]}.txt'
-       
+        output_file = f'bin/clients/output_{my_addr[1]}.log'
+        # Create file handler and set level to DEBUG
+        file_handler = logging.FileHandler(output_file)
+        file_handler.setLevel(logging.DEBUG)
+        # Create formatter
+        file_handler.setFormatter(logging.Formatter('%(message)s'))
+        logger.addHandler(file_handler)
+    
         with open(output_file,'w') as f:
-            print(f"Client started at {my_addr}",file=f)
+            logger.info(f"Client started at {my_addr}",extra={'log_color':'bold_green'})
         
         # connect to the seeds
         with open('config.csv', 'r') as f:    
